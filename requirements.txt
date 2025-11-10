@@ -1,0 +1,19 @@
+# --- Core Web + HTML parsing ---
+requests>=2.31.0
+beautifulsoup4>=4.12.2
+lxml>=4.9.3
+
+# --- Data handling ---
+pandas>=2.2.0
+python-dotenv>=1.0.1
+
+# --- Optional / Browser automation (for legacy LinkedIn tools) ---
+selenium>=4.17.0
+geckodriver-autoinstaller
+
+# --- Utilities ---
+tqdm>=4.66.2
+
+transformers>=4.42.0
+accelerate>=0.30.1
+torch>=2.3.0

@@ -1,0 +1,55 @@
+{
+    "search_linkedin_footprints": {
+      "description": "Searches public LinkedIn profiles by name using search engine footprints.",
+      "args": {
+        "name": { "type": "string", "description": "Full name to search for." },
+        "max_results": { "type": "integer", "description": "Maximum number of results to return.", "default": 3 }
+      },
+      "returns": { "type": "list", "description": "List of LinkedIn profile URLs found." }
+    },
+    "scrape_linkedin_public": {
+      "description": "Extracts visible public data (name, title, job title, about section) from a LinkedIn profile.",
+      "args": {
+        "profile_url": { "type": "string", "description": "LinkedIn profile URL (public only)." }
+      },
+      "returns": { "type": "object", "description": "Dictionary with name, title, job title, about, and error info." }
+    },
+    "find_github_by_name": {
+      "description": "Searches GitHub users by name using the public API.",
+      "args": {
+        "name": { "type": "string", "description": "Full name of the GitHub user to look for." }
+      },
+      "returns": { "type": "object", "description": "Dictionary containing GitHub username or null if not found." }
+    },
+    "fetch_github_profile": {
+      "description": "Fetches a GitHub profile and top repositories using the public API.",
+      "args": {
+        "username_or_url": { "type": "string", "description": "GitHub username or profile URL." },
+        "max_repos": { "type": "integer", "description": "Maximum number of repos to fetch.", "default": 5 }
+      },
+      "returns": { "type": "object", "description": "Profile data and repository details." }
+    },
+    "fallback_people_search": {
+      "description": "Searches for other public mentions, resumes, or portfolios by name.",
+      "args": {
+        "name": { "type": "string", "description": "Full name to search for." }
+      },
+      "returns": { "type": "list", "description": "List of public URLs mentioning the target." }
+    },
+    "find_portfolio_link": {
+      "description": "Analyzes LinkedIn and GitHub data to detect a personal or professional website.",
+      "args": {
+        "sources": { "type": "array", "description": "List of dictionaries containing OSINT data to scan." }
+      },
+      "returns": { "type": "string", "description": "URL of the detected portfolio or null if not found." }
+    },
+    "build_professional_snapshot": {
+      "description": "Combines LinkedIn, GitHub, and other OSINT sources into a structured profile snapshot.",
+      "args": {
+        "name": { "type": "string", "description": "Full name of the person to analyze." },
+        "github_hint": { "type": "string", "description": "Optional GitHub username hint.", "optional": true }
+      },
+      "returns": { "type": "object", "description": "Dictionary containing LinkedIn, GitHub, and portfolio data." }
+    }
+  }
+  
