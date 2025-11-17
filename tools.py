@@ -8,10 +8,6 @@ import requests
 from bs4 import BeautifulSoup, FeatureNotFound
 import pandas as pd
 
-# ================================================================
-# CONFIGURATION
-# ================================================================
-
 DEFAULT_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -22,12 +18,7 @@ DEFAULT_HEADERS = {
 REQUEST_TIMEOUT = 10
 MAX_RETRIES = 2
 
-# ================================================================
-# INTERNAL UTILITIES
-# ================================================================
-
 def _safe_get(url: str, params=None, headers=None, timeout=REQUEST_TIMEOUT) -> Optional[requests.Response]:
-    """Simple GET with retries and polite jitter."""
     headers = headers or DEFAULT_HEADERS
     for attempt in range(1, MAX_RETRIES + 1):
         try:
@@ -54,132 +45,141 @@ def _is_captcha_page_text(text: str) -> bool:
     return any(t in text_l for t in triggers)
 
 
-# ================================================================
-# SEARCH FUNCTIONS
-# ================================================================
-
-def search_linkedin_footprints(name: str, max_results: int = 3) -> List[str]:
-    """Return a list of public LinkedIn profile URLs for a given name."""
-    print(f"Searching LinkedIn profiles for: {name}")
-    name_slug = name.lower().replace(" ", "-").replace(".", "")
-    possible_urls = [
-        f"https://www.linkedin.com/in/{name_slug}/",
-        f"https://www.linkedin.com/in/{name.lower().replace(' ', '')}/",
+def multi_source_linkedin_search(name: str, max_results: int = 5) -> List[Dict[str, str]]:
+    """
+    Multi-source search for LinkedIn profiles using various OSINT techniques.
+    """
+    print(f"Starting multi-source LinkedIn search for: {name}")
+    results = []
+    seen_urls = set()
+    
+    search_engines = [
+        ("DuckDuckGo", f"https://html.duckduckgo.com/html/?q={quote_plus(f'site:linkedin.com/in {name}')}"),
+        ("Bing", f"https://www.bing.com/search?q={quote_plus(f'site:linkedin.com/in {name}')}"),
+        ("Google", f"https://www.google.com/search?q={quote_plus(f'site:linkedin.com/in {name}')}"),
     ]
-
-    query = quote_plus(f'site:linkedin.com/in "{name}"')
-    ddg_url = f"https://html.duckduckgo.com/html/?q={query}"
-
-    r = _safe_get(ddg_url)
-    if not r:
-        print("DuckDuckGo search failed, trying Bing...")
-        return _bing_search_for_linkedin(name, max_results) or possible_urls[:1]
-
-    if _is_captcha_page_text(r.text):
-        print("CAPTCHA detected on DuckDuckGo, using direct URL fallback.")
-        return possible_urls[:1]
-
-    soup = _soup_from_html(r.text)
-    links = []
-    for a in soup.find_all("a", href=True):
-        href = a["href"]
-        if "linkedin.com/in/" in href:
-            clean = href.split("?")[0].split("#")[0]
-            if clean not in links and clean.startswith("http"):
-                links.append(clean)
-        if len(links) >= max_results:
+    
+    for engine_name, url in search_engines:
+        print(f"Trying {engine_name}")
+        r = _safe_get(url)
+        if not r or _is_captcha_page_text(r.text):
+            print(f"{engine_name} blocked or CAPTCHA")
+            continue
+        
+        soup = _soup_from_html(r.text)
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            if "linkedin.com/in/" in href:
+                clean_url = href.split("?")[0].split("#")[0]
+                if clean_url.startswith("http") and clean_url not in seen_urls:
+                    seen_urls.add(clean_url)
+                    results.append({
+                        "url": clean_url,
+                        "source": engine_name,
+                        "title": a.get_text(strip=True)[:100]
+                    })
+                    print(f"Found: {clean_url}")
+            
+            if len(results) >= max_results:
+                break
+        
+        if len(results) >= max_results:
             break
+        
+        time.sleep(random.uniform(0.5, 1.5))
+    
+    if not results:
+        name_slug = name.lower().replace(" ", "-").replace(".", "")
+        direct_urls = [
+            f"https://www.linkedin.com/in/{name_slug}/",
+            f"https://www.linkedin.com/in/{name.lower().replace(' ', '')}/",
+        ]
+        print(f"No results found, trying direct URLs")
+        for url in direct_urls:
+            results.append({"url": url, "source": "Direct", "title": "Direct URL attempt"})
+    
+    print(f"Total LinkedIn profiles found: {len(results)}")
+    return results
 
-    if links:
-        print(f"Found {len(links)} LinkedIn profiles via DuckDuckGo")
-        return links
 
-    print("No results from DuckDuckGo, trying Bing...")
-    bing_results = _bing_search_for_linkedin(name, max_results)
-    if not bing_results:
-        print(f"No results from search engines, trying direct URL: {possible_urls[0]}")
-        return possible_urls[:1]
-    return bing_results
-
-
-def _bing_search_for_linkedin(name: str, max_results: int = 3) -> List[str]:
-    query = quote_plus(f'site:linkedin.com/in "{name}"')
-    url = f"https://www.bing.com/search?q={query}"
-    r = _safe_get(url)
-    if not r or _is_captcha_page_text(r.text):
-        print("Bing blocked or CAPTCHA encountered.")
-        return []
-
-    soup = _soup_from_html(r.text)
-    links = []
-    for a in soup.find_all("a", href=True):
-        href = a["href"]
-        if "linkedin.com/in/" in href:
-            clean = href.split("?")[0].split("#")[0]
-            if clean not in links and clean.startswith("http"):
-                links.append(clean)
-        if len(links) >= max_results:
+def multi_source_github_search(name: str, max_results: int = 5) -> List[Dict[str, str]]:
+    """
+    Multi-source search for GitHub profiles using various OSINT techniques.
+    """
+    print(f"Starting multi-source GitHub search for: {name}")
+    results = []
+    seen_urls = set()
+    
+    search_engines = [
+        ("DuckDuckGo", f"https://html.duckduckgo.com/html/?q={quote_plus(f'site:github.com {name}')}"),
+        ("Bing", f"https://www.bing.com/search?q={quote_plus(f'site:github.com {name}')}"),
+        ("Google", f"https://www.google.com/search?q={quote_plus(f'site:github.com {name}')}"),
+    ]
+    
+    for engine_name, url in search_engines:
+        print(f"Trying {engine_name}")
+        r = _safe_get(url)
+        if not r or _is_captcha_page_text(r.text):
+            print(f"{engine_name} blocked or CAPTCHA")
+            continue
+        
+        soup = _soup_from_html(r.text)
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            if "github.com/" in href and "github.com/search" not in href:
+                clean_url = href.split("?")[0].split("#")[0]
+                if clean_url.startswith("http") and clean_url not in seen_urls:
+                    parts = urlparse(clean_url).path.strip("/").split("/")
+                    if len(parts) >= 1 and parts[0] and not parts[0].startswith("topics"):
+                        seen_urls.add(clean_url)
+                        results.append({
+                            "url": clean_url,
+                            "username": parts[0],
+                            "source": engine_name,
+                            "title": a.get_text(strip=True)[:100]
+                        })
+                        print(f"Found: {clean_url}")
+            
+            if len(results) >= max_results:
+                break
+        
+        if len(results) >= max_results:
             break
-
-    print(f"Found {len(links)} LinkedIn profiles via Bing")
-    return links
-
-
-def fallback_people_search(name: str) -> List[str]:
-    """Generic fallback search for public profiles, resumes, or portfolios."""
-    print(f"No LinkedIn found — running fallback people search for: {name}")
-    query = quote_plus(f'"{name}" (portfolio OR resume OR CV OR developer OR engineer OR designer)')
-    url = f"https://html.duckduckgo.com/html/?q={query}"
-    r = _safe_get(url)
-    if not r or _is_captcha_page_text(r.text):
-        print("Fallback search blocked or CAPTCHA triggered.")
-        return []
-    soup = _soup_from_html(r.text)
-    links = []
-    for a in soup.find_all("a", href=True):
-        href = a["href"]
-        if href.startswith("http") and "duckduckgo.com" not in href:
-            links.append(href)
-        if len(links) >= 5:
-            break
-    print(f"Found {len(links)} alternate public links.")
-    return links
+        
+        time.sleep(random.uniform(0.5, 1.5))
+    
+    print(f"Total GitHub profiles found: {len(results)}")
+    return results
 
 
-# ================================================================
-# GITHUB INTELLIGENCE
-# ================================================================
-
-def find_github_by_name(name: str) -> Optional[str]:
-    """Search GitHub for a user by name (first match)."""
-    print(f"Searching GitHub users by name: {name}")
+def github_api_search(name: str) -> Optional[str]:
+    """
+    Search GitHub using official API with token support.
+    """
+    print(f"Searching GitHub API for: {name}")
     token = os.getenv("GITHUB_TOKEN")
     headers = DEFAULT_HEADERS.copy()
     if token:
         headers["Authorization"] = f"token {token}"
+        print("Using GitHub token for authentication")
+    
     url = f"https://api.github.com/search/users?q={quote_plus(name)}"
     r = _safe_get(url, headers=headers)
     if not r or r.status_code != 200:
-        print(f"GitHub search failed with status {r.status_code if r else 'no_response'}")
+        print(f"GitHub API search failed: {r.status_code if r else 'no_response'}")
         return None
+    
     data = r.json().get("items", [])
-    if not data:
-        print("No GitHub users found by name.")
-        return None
-    username = data[0]["login"]
-    print(f"Found GitHub username candidate: {username}")
-    return username
+    if data:
+        username = data[0]["login"]
+        print(f"GitHub API found: {username}")
+        return username
+    return None
 
-def scrape_linkedin_public(profile_url: str, html_override: Optional[str] = None) -> Dict:
+
+def scrape_linkedin_public(profile_url: str) -> Dict:
     """
-    Scrape a *public* LinkedIn profile for the fields:
-    - full_name
-    - title (headline)
-    - job_title (first listed experience if visible)
-    - talks_about (About summary; often hidden when logged out)
-    Behavior:
-      - If html_override is provided, parse that string instead of fetching the URL (offline demo).
-      - If CAPTCHA is detected, returns {"error":"captcha"} so caller can handle fallback.
+    Scrape public LinkedIn profile data.
     """
     result = {
         "profile_url": profile_url,
@@ -190,29 +190,19 @@ def scrape_linkedin_public(profile_url: str, html_override: Optional[str] = None
         "error": None,
     }
 
-    if html_override:
-        print(f"Using HTML override for {profile_url}")
-        html = html_override
-    else:
-        print(f"Scraping LinkedIn profile: {profile_url}")
-        try:
-            r = _safe_get(profile_url)
-            if not r:
-                result["error"] = "request_failed"
-                return result
-        except Exception as e:
-            result["error"] = f"request_failed: {e}"
-            return result
+    print(f"Scraping LinkedIn profile: {profile_url}")
+    r = _safe_get(profile_url)
+    if not r:
+        result["error"] = "request_failed"
+        return result
 
-        if _is_captcha_page_text(r.text):
-            result["error"] = "captcha"
-            print("CAPTCHA detected on LinkedIn profile")
-            return result
-        html = r.text
+    if _is_captcha_page_text(r.text):
+        result["error"] = "captcha"
+        print("CAPTCHA detected on LinkedIn profile")
+        return result
 
-    soup = _soup_from_html(html)
+    soup = _soup_from_html(r.text)
 
-    # Try multiple selectors for name
     name_selectors = [
         ("div", {"class": "pv-text-details__left-panel"}),
         ("div", {"class": "top-card-layout__entity-info"}),
@@ -228,7 +218,6 @@ def scrape_linkedin_public(profile_url: str, html_override: Optional[str] = None
                 result["full_name"] = h1.get_text(strip=True)
                 break
 
-    # Try multiple selectors for title/headline
     if not result["title"]:
         title_selectors = [
             ("div", {"class": "text-body-medium"}),
@@ -241,7 +230,6 @@ def scrape_linkedin_public(profile_url: str, html_override: Optional[str] = None
                 result["title"] = title_tag.get_text(strip=True)
                 break
 
-    # Try to extract from meta tags (more reliable for public profiles)
     og_title = soup.find("meta", property="og:title")
     if og_title and og_title.get("content"):
         content = og_title.get("content")
@@ -256,14 +244,12 @@ def scrape_linkedin_public(profile_url: str, html_override: Optional[str] = None
     if og_description and og_description.get("content"):
         result["talks_about"] = og_description.get("content").strip()
 
-    # Experience section
     exp_section = soup.find("section", {"id": "experience-section"}) or soup.find("section", string=lambda t: t and "Experience" in t)
     if exp_section:
         job_tag = exp_section.find("h3") or exp_section.find("span", {"class": "visually-hidden"})
         if job_tag:
             result["job_title"] = job_tag.get_text(strip=True)
 
-    # Final fallback: extract from title tag
     if not result["full_name"]:
         t = soup.find("title")
         if t:
@@ -275,7 +261,6 @@ def scrape_linkedin_public(profile_url: str, html_override: Optional[str] = None
             else:
                 result["full_name"] = text.strip()
 
-    # Mark as login required if we got nothing useful
     if not result["full_name"] and not result["title"]:
         result["error"] = "login_required_or_profile_not_found"
 
@@ -283,16 +268,43 @@ def scrape_linkedin_public(profile_url: str, html_override: Optional[str] = None
     return result
 
 
+def extract_linkedin_from_github(github_data: Dict) -> Optional[str]:
+    """
+    Extract LinkedIn URL from GitHub profile bio or blog field.
+    """
+    if not github_data or github_data.get("error"):
+        return None
+    
+    linkedin_pattern = re.compile(r'https?://(?:www\.)?linkedin\.com/in/[a-zA-Z0-9_-]+/?')
+    
+    bio = github_data.get("bio", "")
+    if bio:
+        match = linkedin_pattern.search(bio)
+        if match:
+            linkedin_url = match.group(0).rstrip("/") + "/"
+            print(f"Found LinkedIn URL in GitHub bio: {linkedin_url}")
+            return linkedin_url
+    
+    blog = github_data.get("blog", "")
+    if blog and "linkedin.com" in blog.lower():
+        match = linkedin_pattern.search(blog)
+        if match:
+            linkedin_url = match.group(0).rstrip("/") + "/"
+            print(f"Found LinkedIn URL in GitHub blog field: {linkedin_url}")
+            return linkedin_url
+    
+    return None
+
+
 def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
     """
-    Retrieve basic GitHub user info + top public repos.
-    username_or_url can be a username or full URL like 'https://github.com/octocat'.
-    Uses GitHub API (free, rate-limited). If GITHUB_TOKEN env var present, will use it.
+    Fetch GitHub profile using official API with token support.
     """
     token = os.getenv("GITHUB_TOKEN")
     headers = DEFAULT_HEADERS.copy()
     if token:
         headers["Authorization"] = f"token {token}"
+        print("Using GitHub token for authentication")
 
     if "github.com/" in username_or_url:
         parts = urlparse(username_or_url).path.strip("/").split("/")
@@ -304,13 +316,10 @@ def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
     base = "https://api.github.com"
     user_url = f"{base}/users/{username}"
     
-    try:
-        r = _safe_get(user_url, headers=headers)
-        if not r or r.status_code != 200:
-            print(f"GitHub user not found: {username}")
-            return {"error": f"github_status_{r.status_code if r else 'no_response'}"}
-    except Exception as e:
-        return {"error": f"github_request_failed: {e}"}
+    r = _safe_get(user_url, headers=headers)
+    if not r or r.status_code != 200:
+        print(f"GitHub user not found: {username}")
+        return {"error": f"github_status_{r.status_code if r else 'no_response'}"}
 
     try:
         profile = r.json()
@@ -331,12 +340,8 @@ def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
     }
 
     repos_url = f"{base}/users/{username}/repos?per_page=100&type=owner&sort=updated"
-    try:
-        r2 = _safe_get(repos_url, headers=headers)
-        repos = r2.json() if r2 and r2.status_code == 200 else []
-    except Exception as e:
-        print(f"Failed to fetch repos: {e}")
-        repos = []
+    r2 = _safe_get(repos_url, headers=headers)
+    repos = r2.json() if r2 and r2.status_code == 200 else []
 
     repos_sorted = sorted(repos, key=lambda x: x.get("stargazers_count", 0), reverse=True) if isinstance(repos, list) else []
     info["top_repos"] = [
@@ -345,15 +350,17 @@ def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
         for r in repos_sorted[:min(max_repos, len(repos_sorted))]
     ]
 
+    linkedin_url = extract_linkedin_from_github(info)
+    if linkedin_url:
+        info["linkedin_from_github"] = linkedin_url
+
     print(f"Found GitHub user: {info['name'] or username} with {len(info['top_repos'])} repos")
     return info
 
 
 def find_portfolio_link(sources: List[Dict]) -> Optional[str]:
     """
-    Given a list of dicts (e.g., LinkedIn scrape results and GitHub profile dict),
-    return the best candidate for portfolio/personal site.
-    Looks at GitHub 'blog' field, LinkedIn 'talks_about' and 'title' fields for URLs.
+    Extract portfolio/website from LinkedIn and GitHub data.
     """
     for s in sources:
         if isinstance(s, dict) and s.get("blog"):
@@ -378,66 +385,162 @@ def find_portfolio_link(sources: List[Dict]) -> Optional[str]:
     print("No portfolio link found")
     return None
 
-def build_professional_snapshot(name: str,
-                                use_search: bool = True,
-                                max_search_results: int = 3,
-                                github_hint: Optional[str] = None,
-                                offline_htmls: Optional[List[str]] = None) -> Tuple[Dict, pd.DataFrame]:
-    """Enhanced OSINT snapshot builder with fallbacks."""
-    print(f"\n=== Building professional snapshot for: {name} ===")
-    results, linkedin_urls = [], []
 
-    if use_search:
-        linkedin_urls = search_linkedin_footprints(name, max_results=max_search_results)
-        if not linkedin_urls:
-            # fallback to people search
-            alt_links = fallback_people_search(name)
-            results.append({"profile_url": alt_links, "error": "linkedin_not_found", "source": "people_search"})
+def generate_report(snapshot: Dict, output_file: str = "harvey_report.txt") -> str:
+    """
+    Generate comprehensive text report from OSINT data.
+    """
+    print(f"Generating report: {output_file}")
+    
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write("=" * 80 + "\n")
+        f.write("HARVEY OSINT PROFESSIONAL SNAPSHOT REPORT\n")
+        f.write("=" * 80 + "\n\n")
+        
+        f.write(f"Target: {snapshot.get('query_name', 'Unknown')}\n")
+        f.write(f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        
+        f.write("-" * 80 + "\n")
+        f.write("LINKEDIN PROFILES\n")
+        f.write("-" * 80 + "\n")
+        linkedin_searches = snapshot.get("linkedin_searches", [])
+        if linkedin_searches:
+            for i, result in enumerate(linkedin_searches, 1):
+                f.write(f"{i}. {result.get('url', 'N/A')}\n")
+                f.write(f"   Source: {result.get('source', 'N/A')}\n\n")
+        else:
+            f.write("No LinkedIn profiles found\n")
+        f.write("\n")
+        
+        linkedin_raw = snapshot.get("linkedin_raw", [])
+        if linkedin_raw:
+            f.write("-" * 80 + "\n")
+            f.write("LINKEDIN DATA\n")
+            f.write("-" * 80 + "\n")
+            for profile in linkedin_raw:
+                if isinstance(profile, dict):
+                    f.write(f"Profile URL: {profile.get('profile_url', 'N/A')}\n")
+                    f.write(f"Name: {profile.get('full_name', 'N/A')}\n")
+                    f.write(f"Title: {profile.get('title', 'N/A')}\n")
+                    f.write(f"Job Title: {profile.get('job_title', 'N/A')}\n")
+                    f.write(f"About: {profile.get('talks_about', 'N/A')}\n")
+                    if profile.get('error'):
+                        f.write(f"Error: {profile['error']}\n")
+                    f.write("\n")
+        
+        github_searches = snapshot.get("github_searches", [])
+        if github_searches:
+            f.write("-" * 80 + "\n")
+            f.write("GITHUB PROFILES FOUND\n")
+            f.write("-" * 80 + "\n")
+            for i, result in enumerate(github_searches, 1):
+                f.write(f"{i}. {result.get('url', 'N/A')}\n")
+                f.write(f"   Username: {result.get('username', 'N/A')}\n")
+                f.write(f"   Source: {result.get('source', 'N/A')}\n\n")
+        
+        github = snapshot.get("github")
+        if github and not github.get("error"):
+            f.write("-" * 80 + "\n")
+            f.write("GITHUB PROFILE DATA\n")
+            f.write("-" * 80 + "\n")
+            f.write(f"Username: {github.get('github_username', 'N/A')}\n")
+            f.write(f"Name: {github.get('name', 'N/A')}\n")
+            f.write(f"Bio: {github.get('bio', 'N/A')}\n")
+            f.write(f"Company: {github.get('company', 'N/A')}\n")
+            f.write(f"Location: {github.get('location', 'N/A')}\n")
+            f.write(f"Profile URL: {github.get('profile_url', 'N/A')}\n")
+            f.write(f"Public Repos: {github.get('public_repos', 0)}\n")
+            f.write(f"Followers: {github.get('followers', 0)}\n")
+            f.write(f"Following: {github.get('following', 0)}\n\n")
+            
+            top_repos = github.get("top_repos", [])
+            if top_repos:
+                f.write("Top Repositories:\n")
+                for i, repo in enumerate(top_repos, 1):
+                    f.write(f"  {i}. {repo.get('name', 'N/A')}\n")
+                    f.write(f"     URL: {repo.get('html_url', 'N/A')}\n")
+                    f.write(f"     Description: {repo.get('description', 'N/A')}\n")
+                    f.write(f"     Language: {repo.get('language', 'N/A')}\n")
+                    f.write(f"     Stars: {repo.get('stars', 0)}\n\n")
+        else:
+            f.write("-" * 80 + "\n")
+            f.write("GITHUB PROFILE DATA\n")
+            f.write("-" * 80 + "\n")
+            f.write("No GitHub profile found or error occurred\n\n")
+        
+        portfolio = snapshot.get("portfolio")
+        f.write("-" * 80 + "\n")
+        f.write("PORTFOLIO/WEBSITE\n")
+        f.write("-" * 80 + "\n")
+        if portfolio:
+            f.write(f"{portfolio}\n")
+        else:
+            f.write("No portfolio or personal website found\n")
+        f.write("\n")
+        
+        f.write("=" * 80 + "\n")
+        f.write("END OF REPORT\n")
+        f.write("=" * 80 + "\n")
+    
+    print(f"Report saved to {output_file}")
+    return output_file
 
-    # scrape linkedin
-    for url in linkedin_urls:
+
+def build_professional_snapshot(name: str) -> Tuple[Dict, pd.DataFrame]:
+    """
+    Build comprehensive OSINT snapshot using multi-source search approach.
+    """
+    print(f"\n=== Building professional snapshot for: {name} ===\n")
+    
+    linkedin_searches = multi_source_linkedin_search(name, max_results=5)
+    
+    linkedin_data = []
+    for result in linkedin_searches[:3]:
         try:
-            res = scrape_linkedin_public(url)
-            results.append(res)
+            scraped = scrape_linkedin_public(result["url"])
+            linkedin_data.append(scraped)
             time.sleep(random.uniform(1.0, 2.0))
         except Exception as e:
-            print(f"Error scraping {url}: {e}")
-
-    # GitHub lookup
+            print(f"Error scraping {result['url']}: {e}")
+    
+    github_searches = multi_source_github_search(name, max_results=5)
+    
     github_profile = None
-    gh_candidate = github_hint or find_github_by_name(name)
-    if gh_candidate:
-        gh_info = fetch_github_profile(gh_candidate)
-        if gh_info and not gh_info.get("error"):
-            github_profile = gh_info
-        else:
-            print(f"GitHub lookup failed: {gh_info.get('error')}")
-
+    if github_searches:
+        username = github_searches[0].get("username")
+        if username:
+            github_profile = fetch_github_profile(username)
+    
+    if not github_profile or github_profile.get("error"):
+        api_username = github_api_search(name)
+        if api_username:
+            github_profile = fetch_github_profile(api_username)
+    
     snapshot = {
         "query_name": name,
-        "linkedin_profiles_found": [r.get("profile_url") for r in results if isinstance(r, dict)],
-        "linkedin_raw": results,
+        "linkedin_searches": linkedin_searches,
+        "linkedin_raw": linkedin_data,
+        "github_searches": github_searches,
         "github": github_profile,
     }
-
-    portfolio = find_portfolio_link([github_profile] + results if github_profile else results)
+    
+    portfolio = find_portfolio_link([github_profile] + linkedin_data if github_profile else linkedin_data)
     snapshot["portfolio"] = portfolio
-
+    
     df_rows = []
-    for r in results:
-        if not isinstance(r, dict):
-            continue
-        df_rows.append({
-            "source": r.get("source", "linkedin_public"),
-            "profile_url": r.get("profile_url"),
-            "full_name": r.get("full_name"),
-            "title": r.get("title"),
-            "job_title": r.get("job_title"),
-            "talks_about": r.get("talks_about"),
-            "error": r.get("error"),
-        })
-
-    if github_profile:
+    for profile in linkedin_data:
+        if isinstance(profile, dict):
+            df_rows.append({
+                "source": "linkedin",
+                "profile_url": profile.get("profile_url"),
+                "full_name": profile.get("full_name"),
+                "title": profile.get("title"),
+                "job_title": profile.get("job_title"),
+                "talks_about": profile.get("talks_about"),
+                "error": profile.get("error"),
+            })
+    
+    if github_profile and not github_profile.get("error"):
         df_rows.append({
             "source": "github",
             "profile_url": github_profile.get("profile_url"),
@@ -445,20 +548,25 @@ def build_professional_snapshot(name: str,
             "title": None,
             "job_title": None,
             "talks_about": github_profile.get("bio"),
-            "error": github_profile.get("error"),
+            "error": None,
         })
-
-    df = pd.DataFrame(df_rows or [], columns=["source", "profile_url", "full_name", "title", "job_title", "talks_about", "error"])
+    
+    df = pd.DataFrame(df_rows, columns=["source", "profile_url", "full_name", "title", "job_title", "talks_about", "error"])
+    
+    report_file = generate_report(snapshot)
+    snapshot["report_file"] = report_file
+    
     print(f"\n=== Snapshot complete: {len(df)} records ===\n")
     return snapshot, df
 
 
 tools = [
-    {"name": "search_linkedin_footprints", "description": "Searches public LinkedIn profiles by name using search engine footprints.", "func": search_linkedin_footprints},
-    {"name": "scrape_linkedin_public", "description": "Extracts visible public data (name, title, job title, about) from a LinkedIn profile URL.", "func": scrape_linkedin_public},
-    {"name": "fetch_github_profile", "description": "Fetches GitHub profile data and top repos using the public API.", "func": fetch_github_profile},
-    {"name": "find_portfolio_link", "description": "Analyzes LinkedIn + GitHub data and returns a personal website or portfolio link.", "func": find_portfolio_link},
-    {"name": "find_github_by_name", "description": "Searches GitHub users by name via the public API.", "func": find_github_by_name},
-    {"name": "fallback_people_search", "description": "Searches for other public profiles or resumes when LinkedIn fails.", "func": fallback_people_search},
-    {"name": "build_professional_snapshot", "description": "Aggregates LinkedIn + GitHub + other public sources into a unified OSINT snapshot.", "func": build_professional_snapshot},
+    {"name": "multi_source_linkedin_search", "description": "Multi-source OSINT search for LinkedIn profiles across multiple search engines.", "func": multi_source_linkedin_search},
+    {"name": "multi_source_github_search", "description": "Multi-source OSINT search for GitHub profiles across multiple search engines.", "func": multi_source_github_search},
+    {"name": "github_api_search", "description": "Search GitHub using official API with token support.", "func": github_api_search},
+    {"name": "scrape_linkedin_public", "description": "Scrape public LinkedIn profile data.", "func": scrape_linkedin_public},
+    {"name": "fetch_github_profile", "description": "Fetch GitHub profile using official API with token support.", "func": fetch_github_profile},
+    {"name": "find_portfolio_link", "description": "Extract portfolio/website from LinkedIn and GitHub data.", "func": find_portfolio_link},
+    {"name": "generate_report", "description": "Generate comprehensive text report from OSINT data.", "func": generate_report},
+    {"name": "build_professional_snapshot", "description": "Build comprehensive OSINT snapshot using multi-source search approach.", "func": build_professional_snapshot},
 ]

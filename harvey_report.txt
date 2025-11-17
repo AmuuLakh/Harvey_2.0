@@ -1,0 +1,74 @@
+================================================================================
+HARVEY OSINT PROFESSIONAL SNAPSHOT REPORT
+================================================================================
+
+Target: Amisha Lakhani
+Generated: 2025-11-17 15:08:33
+
+--------------------------------------------------------------------------------
+LINKEDIN PROFILES
+--------------------------------------------------------------------------------
+1. https://www.linkedin.com/in/amisha-lakhani/
+   Source: Direct
+
+2. https://www.linkedin.com/in/amishalakhani/
+   Source: Direct
+
+
+--------------------------------------------------------------------------------
+LINKEDIN DATA
+--------------------------------------------------------------------------------
+Profile URL: https://www.linkedin.com/in/amisha-lakhani/
+Name: None
+Title: None
+Job Title: None
+About: None
+Error: login_required_or_profile_not_found
+
+Profile URL: https://www.linkedin.com/in/amishalakhani/
+Name: None
+Title: None
+Job Title: None
+About: None
+Error: login_required_or_profile_not_found
+
+--------------------------------------------------------------------------------
+GITHUB PROFILE DATA
+--------------------------------------------------------------------------------
+Username: AmuuLakh
+Name: Amisha Lakhani
+Bio: None
+Company: None
+Location: None
+Profile URL: https://github.com/AmuuLakh
+Public Repos: 3
+Followers: 4
+Following: 4
+
+Top Repositories:
+  1. AmuuLakh
+     URL: https://github.com/AmuuLakh/AmuuLakh
+     Description: None
+     Language: None
+     Stars: 0
+
+  2. MLOps_Pipeline
+     URL: https://github.com/AmuuLakh/MLOps_Pipeline
+     Description: None
+     Language: Python
+     Stars: 0
+
+  3. cfa-agent
+     URL: https://github.com/AmuuLakh/cfa-agent
+     Description: None
+     Language: None
+     Stars: 0
+
+--------------------------------------------------------------------------------
+PORTFOLIO/WEBSITE
+--------------------------------------------------------------------------------
+No portfolio or personal website found
+
+================================================================================
+END OF REPORT
+================================================================================

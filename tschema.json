@@ -1,55 +1,69 @@
 {
-    "search_linkedin_footprints": {
-      "description": "Searches public LinkedIn profiles by name using search engine footprints.",
-      "args": {
-        "name": { "type": "string", "description": "Full name to search for." },
-        "max_results": { "type": "integer", "description": "Maximum number of results to return.", "default": 3 }
-      },
-      "returns": { "type": "list", "description": "List of LinkedIn profile URLs found." }
+  "multi_source_linkedin_search": {
+    "description": "Multi-source OSINT search for LinkedIn profiles across DuckDuckGo, Bing, and Google.",
+    "args": {
+      "name": { "type": "string", "description": "Full name to search for." },
+      "max_results": { "type": "integer", "description": "Maximum number of results to return.", "default": 5 }
     },
-    "scrape_linkedin_public": {
-      "description": "Extracts visible public data (name, title, job title, about section) from a LinkedIn profile.",
-      "args": {
-        "profile_url": { "type": "string", "description": "LinkedIn profile URL (public only)." }
-      },
-      "returns": { "type": "object", "description": "Dictionary with name, title, job title, about, and error info." }
+    "returns": { "type": "list", "description": "List of dictionaries with URL, source, and title." }
+  },
+  "multi_source_github_search": {
+    "description": "Multi-source OSINT search for GitHub profiles across DuckDuckGo, Bing, and Google.",
+    "args": {
+      "name": { "type": "string", "description": "Full name to search for." },
+      "max_results": { "type": "integer", "description": "Maximum number of results to return.", "default": 5 }
     },
-    "find_github_by_name": {
-      "description": "Searches GitHub users by name using the public API.",
-      "args": {
-        "name": { "type": "string", "description": "Full name of the GitHub user to look for." }
-      },
-      "returns": { "type": "object", "description": "Dictionary containing GitHub username or null if not found." }
+    "returns": { "type": "list", "description": "List of dictionaries with URL, username, source, and title." }
+  },
+  "github_api_search": {
+    "description": "Search GitHub using official API with token support.",
+    "args": {
+      "name": { "type": "string", "description": "Full name to search for." }
     },
-    "fetch_github_profile": {
-      "description": "Fetches a GitHub profile and top repositories using the public API.",
-      "args": {
-        "username_or_url": { "type": "string", "description": "GitHub username or profile URL." },
-        "max_repos": { "type": "integer", "description": "Maximum number of repos to fetch.", "default": 5 }
-      },
-      "returns": { "type": "object", "description": "Profile data and repository details." }
+    "returns": { "type": "string", "description": "GitHub username or null if not found." }
+  },
+  "extract_linkedin_from_github": {
+    "description": "Extract LinkedIn URL from GitHub profile bio or blog field.",
+    "args": {
+      "github_data": { "type": "object", "description": "GitHub profile data dictionary." }
     },
-    "fallback_people_search": {
-      "description": "Searches for other public mentions, resumes, or portfolios by name.",
-      "args": {
-        "name": { "type": "string", "description": "Full name to search for." }
-      },
-      "returns": { "type": "list", "description": "List of public URLs mentioning the target." }
+    "returns": { "type": "string", "description": "LinkedIn URL or null if not found." }
+  },
+  "scrape_linkedin_public": {
+    "description": "Scrape public LinkedIn profile data.",
+    "args": {
+      "profile_url": { "type": "string", "description": "LinkedIn profile URL." }
     },
-    "find_portfolio_link": {
-      "description": "Analyzes LinkedIn and GitHub data to detect a personal or professional website.",
-      "args": {
-        "sources": { "type": "array", "description": "List of dictionaries containing OSINT data to scan." }
-      },
-      "returns": { "type": "string", "description": "URL of the detected portfolio or null if not found." }
+    "returns": { "type": "object", "description": "Dictionary with name, title, job title, about, and error info." }
+  },
+  "fetch_github_profile": {
+    "description": "Fetch GitHub profile using official API with token support.",
+    "args": {
+      "username_or_url": { "type": "string", "description": "GitHub username or profile URL." },
+      "max_repos": { "type": "integer", "description": "Maximum number of repos to fetch.", "default": 5 }
     },
-    "build_professional_snapshot": {
-      "description": "Combines LinkedIn, GitHub, and other OSINT sources into a structured profile snapshot.",
-      "args": {
-        "name": { "type": "string", "description": "Full name of the person to analyze." },
-        "github_hint": { "type": "string", "description": "Optional GitHub username hint.", "optional": true }
-      },
-      "returns": { "type": "object", "description": "Dictionary containing LinkedIn, GitHub, and portfolio data." }
-    }
+    "returns": { "type": "object", "description": "Profile data and repository details." }
+  },
+  "find_portfolio_link": {
+    "description": "Extract portfolio/website from LinkedIn and GitHub data.",
+    "args": {
+      "sources": { "type": "array", "description": "List of dictionaries containing OSINT data." }
+    },
+    "returns": { "type": "string", "description": "Portfolio URL or null if not found." }
+  },
+  "generate_report": {
+    "description": "Generate comprehensive text report from OSINT data.",
+    "args": {
+      "snapshot": { "type": "object", "description": "Snapshot dictionary containing all gathered OSINT data." },
+      "output_file": { "type": "string", "description": "Output filename for the report.", "default": "harvey_report.txt" }
+    },
+    "returns": { "type": "string", "description": "Path to the generated report file." }
+  },
+  "build_professional_snapshot": {
+    "description": "Build comprehensive OSINT snapshot using multi-source search approach.",
+    "args": {
+      "name": { "type": "string", "description": "Full name of the person to analyze." }
+    },
+    "returns": { "type": "object", "description": "Dictionary containing all OSINT data and report file path." }
   }
-  
+}
