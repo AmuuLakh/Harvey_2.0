@@ -9,6 +9,10 @@ from bs4 import BeautifulSoup, FeatureNotFound
 import pandas as pd
 import base64
 
+# ================================================================
+# CONFIGURATION
+# ================================================================
+
 DEFAULT_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -18,6 +22,10 @@ DEFAULT_HEADERS = {
 }
 REQUEST_TIMEOUT = 10
 MAX_RETRIES = 2
+
+# ================================================================
+# ENHANCED UTILITIES FOR GITHUB DETECTION
+# ================================================================
 
 def _safe_get(url: str, params=None, headers=None, timeout=REQUEST_TIMEOUT) -> Optional[requests.Response]:
     """Simple GET with retries and polite jitter."""
@@ -55,6 +63,7 @@ def _extract_linkedin_from_text(text: str) -> Optional[str]:
     if not text:
         return None
     
+    # More comprehensive LinkedIn URL patterns
     patterns = [
         r'(https?://(?:www\.)?linkedin\.com/in/[\w\-]+)/?',
         r'(https?://(?:www\.)?linkedin\.com/company/[\w\-]+)/?',
@@ -69,15 +78,17 @@ def _extract_linkedin_from_text(text: str) -> Optional[str]:
             if isinstance(match, tuple):
                 match = match[0]
             
+            # Ensure it's a full URL
             if match.startswith('http'):
-                
+                # Clean up the URL
                 clean_url = match.split('?')[0].split('#')[0]
                 return clean_url.rstrip('/')
             else:
-                
+                # Construct full URL from username
                 return f"https://www.linkedin.com/in/{match}"
     
     return None
+
 
 def _extract_email_from_text(text: str) -> Optional[str]:
     """
@@ -86,6 +97,7 @@ def _extract_email_from_text(text: str) -> Optional[str]:
     if not text:
         return None
     
+    # Comprehensive email patterns
     email_patterns = [
         r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
         r'email\s*[:\-]?\s*([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,})',
@@ -98,6 +110,7 @@ def _extract_email_from_text(text: str) -> Optional[str]:
         for match in matches:
             if isinstance(match, tuple):
                 match = match[0]
+            # Basic email validation
             if '@' in match and '.' in match and len(match) > 5:
                 return match.lower()
     
@@ -109,6 +122,8 @@ def _fetch_github_readme_content(username: str, headers: Dict) -> str:
     Fetch README content from GitHub profile and repositories
     """
     all_content = ""
+    
+    # Try profile README first
     readme_urls = [
         f"https://api.github.com/repos/{username}/{username}/readme",
         f"https://api.github.com/repos/{username}/README/readme",
@@ -124,9 +139,8 @@ def _fetch_github_readme_content(username: str, headers: Dict) -> str:
                 if content:
                     decoded_content = base64.b64decode(content).decode('utf-8')
                     all_content += f" {decoded_content}"
-                    print(f"Found README content from {readme_url}")
+                    print(f"✅ Found README content from {readme_url}")
         except Exception as e:
-            print(f"Error: {e}")
             continue
     
     return all_content
@@ -144,10 +158,12 @@ def _fetch_github_repo_descriptions(username: str, headers: Dict, max_repos: int
         if r and r.status_code == 200:
             repos = r.json()
             for repo in repos:
+                # Repository description
                 desc = repo.get("description", "")
                 if desc:
                     all_descriptions += f" {desc}"
- 
+                
+                # Repository name (sometimes contains info)
                 repo_name = repo.get("name", "")
                 if "linkedin" in repo_name.lower() or "portfolio" in repo_name.lower():
                     all_descriptions += f" {repo_name}"
@@ -166,17 +182,21 @@ def _scrape_github_profile_page(username: str) -> str:
         r = _safe_get(profile_url)
         if r and r.status_code == 200:
             soup = _soup_from_html(r.text)
-
+            
+            # Extract from profile page
             profile_content = ""
-
+            
+            # Bio section
             bio_div = soup.find("div", {"class": "p-note"})
             if bio_div:
                 profile_content += f" {bio_div.get_text(strip=True)}"
-   
+            
+            # Status/header
             status_div = soup.find("div", {"class": "user-status-message-wrapper"})
             if status_div:
                 profile_content += f" {status_div.get_text(strip=True)}"
             
+            # Website links
             website_link = soup.find("a", {"class": "Link--primary", "rel": "nofollow me"})
             if website_link and website_link.get("href"):
                 profile_content += f" {website_link.get('href')}"
@@ -186,6 +206,11 @@ def _scrape_github_profile_page(username: str) -> str:
         print(f"Error scraping GitHub profile page: {e}")
     
     return ""
+
+
+# ================================================================
+# ENHANCED GITHUB PROFILE FETCHING
+# ================================================================
 
 def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
     """
@@ -203,7 +228,7 @@ def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
     else:
         username = username_or_url
 
-    print(f"Enhanced GitHub scan for: {username}")
+    print(f"🔍 Enhanced GitHub scan for: {username}")
     base = "https://api.github.com"
     user_url = f"{base}/users/{username}"
     
@@ -234,8 +259,17 @@ def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
         "linkedin_from_github": None,
         "email_from_github": None,
     }
+
+    # ================================================================
+    # AGGRESSIVE LINKEDIN & EMAIL DETECTION
+    # ================================================================
+    
+    print(f"🕵️  Scanning multiple sources for LinkedIn/Email...")
+    
+    # Collect text from multiple sources
     all_text_sources = []
     
+    # 1. Basic profile fields
     basic_fields = [
         profile.get("bio", ""),
         profile.get("blog", ""),
@@ -244,47 +278,55 @@ def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
         profile.get("name", ""),
     ]
     all_text_sources.extend(basic_fields)
-
+    
+    # 2. GitHub README content
     readme_content = _fetch_github_readme_content(username, headers)
     if readme_content:
         all_text_sources.append(readme_content)
-        print(f"Scanned README files")
+        print(f"   📖 Scanned README files")
     
+    # 3. Repository descriptions
     repo_descriptions = _fetch_github_repo_descriptions(username, headers, max_repos=10)
     if repo_descriptions:
         all_text_sources.append(repo_descriptions)
-        print(f"Scanned {max_repos} repo descriptions")
+        print(f"   📚 Scanned {max_repos} repo descriptions")
     
+    # 4. Profile page scraping (as fallback)
     profile_page_content = _scrape_github_profile_page(username)
     if profile_page_content:
         all_text_sources.append(profile_page_content)
-        print(f"Scanned profile page")
-   
+        print(f"   🌐 Scanned profile page")
+    
+    # Combine all text for analysis
     combined_text = " ".join([str(text) for text in all_text_sources if text])
-   
+    
+    # Search for LinkedIn in combined text
     linkedin_url = None
     email_address = None
     
     if combined_text:
-        print(f"Analyzing {len(combined_text)} characters of text...")
-
+        print(f"   🔎 Analyzing {len(combined_text)} characters of text...")
+        
+        # LinkedIn detection
         linkedin_url = _extract_linkedin_from_text(combined_text)
         if linkedin_url:
-            print(f"LinkedIn found: {linkedin_url}")
+            print(f"   ✅ LinkedIn found: {linkedin_url}")
         else:
-            print(f"No LinkedIn detected in GitHub data")
-
+            print(f"   ❌ No LinkedIn detected in GitHub data")
+        
+        # Email detection
         email_address = _extract_email_from_text(combined_text)
         if email_address:
-            print(f"Email found: {email_address}")
+            print(f"   ✅ Email found: {email_address}")
         else:
-            print(f"No email detected in GitHub data")
+            print(f"   ❌ No email detected in GitHub data")
     else:
-        print(f"No text content found for analysis")
+        print(f"   ⚠️  No text content found for analysis")
 
     info["linkedin_from_github"] = linkedin_url
     info["email_from_github"] = email_address
 
+    # Fetch repositories for display
     repos_url = f"{base}/users/{username}/repos?per_page=100&type=owner&sort=updated"
     try:
         r2 = _safe_get(repos_url, headers=headers)
@@ -293,6 +335,7 @@ def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
         print(f"Failed to fetch repos: {e}")
         repos = []
 
+    # Process top repos for display
     repos_sorted = sorted(repos, key=lambda x: x.get("stargazers_count", 0), reverse=True) if isinstance(repos, list) else []
     info["top_repos"] = [
         {"name": r.get("name"), "html_url": r.get("html_url"), "description": r.get("description"),
@@ -300,6 +343,7 @@ def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
         for r in repos_sorted[:min(max_repos, len(repos_sorted))]
     ]
 
+    # Final summary
     findings = []
     if linkedin_url:
         findings.append("LinkedIn")
@@ -307,12 +351,17 @@ def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
         findings.append("Email")
     
     if findings:
-        print(f"SUCCESS: Found {', '.join(findings)} in GitHub data")
+        print(f"🎯 SUCCESS: Found {', '.join(findings)} in GitHub data")
     else:
-        print(f"ℹ️ No contact info found in GitHub data for {username}")
+        print(f"ℹ️  No contact info found in GitHub data for {username}")
 
     print(f"Found GitHub user: {info['name'] or username} with {len(info['top_repos'])} repos")
     return info
+
+
+# ================================================================
+# KEEP ALL OTHER FUNCTIONS THE SAME (but update build_professional_snapshot)
+# ================================================================
 
 def build_professional_snapshot(name: str,
                                 use_search: bool = True,
@@ -326,9 +375,11 @@ def build_professional_snapshot(name: str,
     if use_search:
         linkedin_urls = search_linkedin_footprints(name, max_results=max_search_results)
         if not linkedin_urls:
+            # fallback to people search
             alt_links = fallback_people_search(name)
             results.append({"profile_url": alt_links, "error": "linkedin_not_found", "source": "people_search"})
 
+    # scrape linkedin
     for url in linkedin_urls:
         try:
             res = scrape_linkedin_public(url)
@@ -337,6 +388,7 @@ def build_professional_snapshot(name: str,
         except Exception as e:
             print(f"Error scraping {url}: {e}")
 
+    # GitHub lookup
     github_profile = None
     gh_candidate = github_hint or find_github_by_name(name)
     if gh_candidate:
@@ -345,33 +397,41 @@ def build_professional_snapshot(name: str,
             github_profile = gh_info
         else:
             print(f"GitHub lookup failed: {gh_info.get('error')}")
+
+    # ================================================================
+    # LINKEDIN VALIDATION & REPLACEMENT LOGIC
+    # ================================================================
     
     validated_linkedin_urls = linkedin_urls.copy()
     validated_results = results.copy()
     
     if github_profile and github_profile.get("linkedin_from_github"):
         github_linkedin = github_profile["linkedin_from_github"]
-        print(f"Validating LinkedIn from GitHub: {github_linkedin}")
+        print(f"🔍 Validating LinkedIn from GitHub: {github_linkedin}")
         
+        # Check if this GitHub LinkedIn is different from what we found
         if github_linkedin not in validated_linkedin_urls:
-            print(f"GitHub LinkedIn is different from search results")
-            print(f"Search found: {validated_linkedin_urls}")
-            print(f"GitHub has: {github_linkedin}")
+            print(f"🔄 GitHub LinkedIn is different from search results")
+            print(f"   Search found: {validated_linkedin_urls}")
+            print(f"   GitHub has: {github_linkedin}")
             
+            # Test the GitHub LinkedIn URL to make sure it's valid
             print(f"   Testing GitHub LinkedIn URL...")
             test_result = scrape_linkedin_public(github_linkedin)
             
             if test_result and not test_result.get("error") and test_result.get("full_name"):
+                # GitHub LinkedIn is valid - replace our list
                 validated_linkedin_urls = [github_linkedin]
+                # Remove old results and add the validated one
                 validated_results = [test_result]
-                print(f"SUCCESS: Using GitHub-validated LinkedIn: {github_linkedin}")
-                print(f"Profile name: {test_result.get('full_name')}")
+                print(f"✅ SUCCESS: Using GitHub-validated LinkedIn: {github_linkedin}")
+                print(f"   Profile name: {test_result.get('full_name')}")
             else:
-                print(f"GitHub LinkedIn failed validation, keeping original results")
+                print(f"❌ GitHub LinkedIn failed validation, keeping original results")
                 if test_result and test_result.get("error"):
                     print(f"   Error: {test_result.get('error')}")
         else:
-            print(f"GitHub LinkedIn matches our search results")
+            print(f"✅ GitHub LinkedIn matches our search results")
 
     snapshot = {
         "query_name": name,
@@ -415,14 +475,20 @@ def build_professional_snapshot(name: str,
 
     df = pd.DataFrame(df_rows or [], columns=["source", "profile_url", "full_name", "title", "job_title", "talks_about", "error", "linkedin_from_github", "email_from_github"])
     print(f"\n=== Snapshot complete: {len(df)} records ===\n")
-
+    
+    # Final validation report
     if github_profile and github_profile.get("linkedin_from_github"):
         if github_profile["linkedin_from_github"] in validated_linkedin_urls:
-            print(f"SUCCESS: LinkedIn validated via GitHub - using authoritative source")
+            print(f"🎯 SUCCESS: LinkedIn validated via GitHub - using authoritative source")
         else:
-            print(f"WARNING: LinkedIn from GitHub couldn't be validated")
+            print(f"⚠️  WARNING: LinkedIn from GitHub couldn't be validated")
     
     return snapshot, df
+
+
+# ================================================================
+# KEEP ALL OTHER EXISTING FUNCTIONS EXACTLY THE SAME
+# ================================================================
 
 def search_linkedin_footprints(name: str, max_results: int = 3) -> List[str]:
     """Return a list of public LinkedIn profile URLs for a given name."""
@@ -566,6 +632,7 @@ def scrape_linkedin_public(profile_url: str, html_override: Optional[str] = None
 
     soup = _soup_from_html(html)
 
+    # Try multiple selectors for name
     name_selectors = [
         ("div", {"class": "pv-text-details__left-panel"}),
         ("div", {"class": "top-card-layout__entity-info"}),
@@ -581,6 +648,7 @@ def scrape_linkedin_public(profile_url: str, html_override: Optional[str] = None
                 result["full_name"] = h1.get_text(strip=True)
                 break
 
+    # Try multiple selectors for title/headline
     if not result["title"]:
         title_selectors = [
             ("div", {"class": "text-body-medium"}),
@@ -593,6 +661,7 @@ def scrape_linkedin_public(profile_url: str, html_override: Optional[str] = None
                 result["title"] = title_tag.get_text(strip=True)
                 break
 
+    # Try to extract from meta tags (more reliable for public profiles)
     og_title = soup.find("meta", property="og:title")
     if og_title and og_title.get("content"):
         content = og_title.get("content")
@@ -607,12 +676,14 @@ def scrape_linkedin_public(profile_url: str, html_override: Optional[str] = None
     if og_description and og_description.get("content"):
         result["talks_about"] = og_description.get("content").strip()
 
+    # Experience section
     exp_section = soup.find("section", {"id": "experience-section"}) or soup.find("section", string=lambda t: t and "Experience" in t)
     if exp_section:
         job_tag = exp_section.find("h3") or exp_section.find("span", {"class": "visually-hidden"})
         if job_tag:
             result["job_title"] = job_tag.get_text(strip=True)
 
+    # Final fallback: extract from title tag
     if not result["full_name"]:
         t = soup.find("title")
         if t:
@@ -624,6 +695,7 @@ def scrape_linkedin_public(profile_url: str, html_override: Optional[str] = None
             else:
                 result["full_name"] = text.strip()
 
+    # Mark as login required if we got nothing useful
     if not result["full_name"] and not result["title"]:
         result["error"] = "login_required_or_profile_not_found"
 
@@ -635,11 +707,14 @@ def find_portfolio_link(sources: List[Dict]) -> Optional[str]:
     """
     Enhanced portfolio finder that also considers LinkedIn URLs from GitHub.
     """
+    # First, check for LinkedIn from GitHub (highest priority)
     for s in sources:
         if isinstance(s, dict) and s.get("linkedin_from_github"):
             linkedin_url = s["linkedin_from_github"]
-            print(f"Found LinkedIn from GitHub: {linkedin_url}")
+            print(f"🔗 Found LinkedIn from GitHub: {linkedin_url}")
+            # We don't return LinkedIn as portfolio, but we log it
     
+    # Then check for regular portfolio links
     for s in sources:
         if isinstance(s, dict) and s.get("blog"):
             blog = s["blog"].strip()
@@ -657,7 +732,7 @@ def find_portfolio_link(sources: List[Dict]) -> Optional[str]:
                 m = url_re.search(str(v))
                 if m:
                     url = m.group(0).rstrip(".,;")
-                    if "linkedin.com" not in url: 
+                    if "linkedin.com" not in url:  # Don't return LinkedIn as portfolio
                         print(f"Found portfolio link: {url}")
                         return url
 

@@ -1,0 +1,30 @@
+# 📊 COMPREHENSIVE OSINT REPORT
+**Target:** Amisha Lakhani
+**Generated:** 2025-11-18 23:33:01
+
+## 🔗 LinkedIn Findings
+Profiles Found: 1
+1. https://www.linkedin.com/in/amisha-lakhani/
+
+## 💻 GitHub Findings
+Username: AmuuLakh
+Name: Amisha Lakhani
+Bio: None
+Location: None
+Public Repositories: 5
+Followers: 9
+Following: 11
+LinkedIn in GitHub Bio: https://www.linkedin.com/in/amisha-lakhani-2ba594295
+
+## 🌐 Portfolio/Website
+No portfolio website found
+
+## 👤 Profile Details
+---
+
+## 📈 Summary
+Total Data Sources: 2
+Confidence Level: High
+Recommendation: Further investigation recommended
+
+*Report generated from public sources only.*
