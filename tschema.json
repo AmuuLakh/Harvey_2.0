@@ -59,6 +59,22 @@
     },
     "returns": { "type": "string", "description": "Path to the generated report file." }
   },
+  "compare_profiles": {
+    "description": "Compare two profiles and generate strength/weakness analysis.",
+    "args": {
+      "name1": { "type": "string", "description": "Full name of first person." },
+      "name2": { "type": "string", "description": "Full name of second person." }
+    },
+    "returns": { "type": "object", "description": "Comparison results with analysis and report file path." }
+  },
+  "generate_comparison_report": {
+    "description": "Generate comparison report between two profiles.",
+    "args": {
+      "comparison": { "type": "object", "description": "Comparison dictionary with analysis data." },
+      "output_file": { "type": "string", "description": "Output filename for the report.", "default": "harvey_comparison.txt" }
+    },
+    "returns": { "type": "string", "description": "Path to the generated comparison report file." }
+  },
   "build_professional_snapshot": {
     "description": "Build comprehensive OSINT snapshot using multi-source search approach.",
     "args": {

@@ -98,7 +98,7 @@ class HarveyAgent:
             return {}
         try:
             data = json.loads(match.group(0))
-            if "action" in data:
+            if "tool" in data:
                 return data
         except json.JSONDecodeError:
             pass
@@ -152,7 +152,7 @@ class HarveyAgent:
         if not action or action.get("action") == "finish":
             return messages, reply
 
-        tool_name = action.get("action")
+        tool_name = action.get("tool")
         args = action.get("args", {})
 
         # Step 3 — Run the tool
@@ -168,3 +168,4 @@ class HarveyAgent:
 
         messages.append({"role": "assistant", "content": followup})
         return messages, followup
+    

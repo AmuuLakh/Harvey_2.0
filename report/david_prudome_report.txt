@@ -1,0 +1,81 @@
+================================================================================
+HARVEY OSINT PROFESSIONAL SNAPSHOT REPORT
+================================================================================
+
+Target: David Prudome
+Generated: 2025-11-18 14:02:50
+
+--------------------------------------------------------------------------------
+LINKEDIN PROFILES
+--------------------------------------------------------------------------------
+1. https://www.linkedin.com/in/david-prudome/
+   Source: Direct
+
+2. https://www.linkedin.com/in/davidprudome/
+   Source: Direct
+
+
+--------------------------------------------------------------------------------
+LINKEDIN DATA
+--------------------------------------------------------------------------------
+Profile URL: https://www.linkedin.com/in/david-prudome/
+Name: None
+Title: None
+Job Title: None
+About: None
+Error: login_required_or_profile_not_found
+
+Profile URL: https://www.linkedin.com/in/davidprudome/
+Name: None
+Title: None
+Job Title: None
+About: None
+Error: login_required_or_profile_not_found
+
+--------------------------------------------------------------------------------
+GITHUB PROFILE DATA
+--------------------------------------------------------------------------------
+Username: dairo95
+Name: David Prudome
+Bio: Student in Artificial Intelligence and Data Science. In pursuit of greatness !
+Interested in Data, Mechanics and IoT Systems 
+Company: None
+Location: Paris 
+Profile URL: https://github.com/dairo95
+Public Repos: 4
+Followers: 3
+Following: 3
+
+Top Repositories:
+  1. cfa-agent
+     URL: https://github.com/dairo95/cfa-agent
+     Description: None
+     Language: Python
+     Stars: 0
+
+  2. rag_ultimate
+     URL: https://github.com/dairo95/rag_ultimate
+     Description: None
+     Language: Python
+     Stars: 0
+
+  3. sentiment_analysis_BERT
+     URL: https://github.com/dairo95/sentiment_analysis_BERT
+     Description: None
+     Language: Python
+     Stars: 0
+
+  4. calculator-
+     URL: https://github.com/dairo95/calculator-
+     Description: None
+     Language: None
+     Stars: 0
+
+--------------------------------------------------------------------------------
+PORTFOLIO/WEBSITE
+--------------------------------------------------------------------------------
+No portfolio or personal website found
+
+================================================================================
+END OF REPORT
+================================================================================

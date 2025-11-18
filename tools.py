@@ -275,23 +275,21 @@ def extract_linkedin_from_github(github_data: Dict) -> Optional[str]:
     if not github_data or github_data.get("error"):
         return None
     
-    linkedin_pattern = re.compile(r'https?://(?:www\.)?linkedin\.com/in/[a-zA-Z0-9_-]+/?')
+    linkedin_pattern = re.compile(r'https?://(?:www\.)?linkedin\.com/in/[a-zA-Z0-9_-]+/?', re.IGNORECASE)
     
-    bio = github_data.get("bio", "")
-    if bio:
-        match = linkedin_pattern.search(bio)
-        if match:
-            linkedin_url = match.group(0).rstrip("/") + "/"
-            print(f"Found LinkedIn URL in GitHub bio: {linkedin_url}")
-            return linkedin_url
+    fields_to_check = [
+        github_data.get("bio", ""),
+        github_data.get("blog", ""),
+        github_data.get("company", ""),
+    ]
     
-    blog = github_data.get("blog", "")
-    if blog and "linkedin.com" in blog.lower():
-        match = linkedin_pattern.search(blog)
-        if match:
-            linkedin_url = match.group(0).rstrip("/") + "/"
-            print(f"Found LinkedIn URL in GitHub blog field: {linkedin_url}")
-            return linkedin_url
+    for field in fields_to_check:
+        if field:
+            match = linkedin_pattern.search(str(field))
+            if match:
+                linkedin_url = match.group(0).rstrip("/") + "/"
+                print(f"Found LinkedIn URL in GitHub profile: {linkedin_url}")
+                return linkedin_url
     
     return None
 
@@ -386,10 +384,16 @@ def find_portfolio_link(sources: List[Dict]) -> Optional[str]:
     return None
 
 
-def generate_report(snapshot: Dict, output_file: str = "harvey_report.txt") -> str:
+def generate_report(snapshot: Dict, output_file: str = None) -> str:
     """
     Generate comprehensive text report from OSINT data.
     """
+    if not output_file:
+        target_name = snapshot.get('query_name', 'unknown').replace(" ", "_").lower()
+        output_file = f"report/{target_name}_report.txt"
+    
+    os.makedirs("report", exist_ok=True)
+    
     print(f"Generating report: {output_file}")
     
     with open(output_file, "w", encoding="utf-8") as f:
@@ -400,6 +404,14 @@ def generate_report(snapshot: Dict, output_file: str = "harvey_report.txt") -> s
         f.write(f"Target: {snapshot.get('query_name', 'Unknown')}\n")
         f.write(f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         
+        github = snapshot.get("github")
+        if github and not github.get("error") and github.get("linkedin_from_github"):
+            f.write("-" * 80 + "\n")
+            f.write("LINKEDIN FROM GITHUB BIO\n")
+            f.write("-" * 80 + "\n")
+            f.write(f"LinkedIn URL found in GitHub profile: {github.get('linkedin_from_github')}\n")
+            f.write("This profile has been automatically scraped and included below.\n\n")
+        
         f.write("-" * 80 + "\n")
         f.write("LINKEDIN PROFILES\n")
         f.write("-" * 80 + "\n")
@@ -409,7 +421,7 @@ def generate_report(snapshot: Dict, output_file: str = "harvey_report.txt") -> s
                 f.write(f"{i}. {result.get('url', 'N/A')}\n")
                 f.write(f"   Source: {result.get('source', 'N/A')}\n\n")
         else:
-            f.write("No LinkedIn profiles found\n")
+            f.write("No LinkedIn profiles found via search\n")
         f.write("\n")
         
         linkedin_raw = snapshot.get("linkedin_raw", [])
@@ -419,7 +431,8 @@ def generate_report(snapshot: Dict, output_file: str = "harvey_report.txt") -> s
             f.write("-" * 80 + "\n")
             for profile in linkedin_raw:
                 if isinstance(profile, dict):
-                    f.write(f"Profile URL: {profile.get('profile_url', 'N/A')}\n")
+                    source_note = " (from GitHub bio)" if profile.get("source") == "github_bio" else ""
+                    f.write(f"Profile URL: {profile.get('profile_url', 'N/A')}{source_note}\n")
                     f.write(f"Name: {profile.get('full_name', 'N/A')}\n")
                     f.write(f"Title: {profile.get('title', 'N/A')}\n")
                     f.write(f"Job Title: {profile.get('job_title', 'N/A')}\n")
@@ -438,7 +451,6 @@ def generate_report(snapshot: Dict, output_file: str = "harvey_report.txt") -> s
                 f.write(f"   Username: {result.get('username', 'N/A')}\n")
                 f.write(f"   Source: {result.get('source', 'N/A')}\n\n")
         
-        github = snapshot.get("github")
         if github and not github.get("error"):
             f.write("-" * 80 + "\n")
             f.write("GITHUB PROFILE DATA\n")
@@ -451,7 +463,10 @@ def generate_report(snapshot: Dict, output_file: str = "harvey_report.txt") -> s
             f.write(f"Profile URL: {github.get('profile_url', 'N/A')}\n")
             f.write(f"Public Repos: {github.get('public_repos', 0)}\n")
             f.write(f"Followers: {github.get('followers', 0)}\n")
-            f.write(f"Following: {github.get('following', 0)}\n\n")
+            f.write(f"Following: {github.get('following', 0)}\n")
+            if github.get('linkedin_from_github'):
+                f.write(f"LinkedIn in bio: {github.get('linkedin_from_github')}\n")
+            f.write("\n")
             
             top_repos = github.get("top_repos", [])
             if top_repos:
@@ -486,6 +501,210 @@ def generate_report(snapshot: Dict, output_file: str = "harvey_report.txt") -> s
     return output_file
 
 
+def compare_profiles(name1: str, name2: str) -> Dict:
+    """
+    Compare two professional profiles and provide strength/weakness analysis.
+    """
+    print(f"\n=== Comparing profiles: {name1} vs {name2} ===\n")
+    
+    print(f"Building snapshot for {name1}")
+    snapshot1, _ = build_professional_snapshot(name1)
+    
+    print(f"Building snapshot for {name2}")
+    snapshot2, _ = build_professional_snapshot(name2)
+    
+    comparison = {
+        "person1": name1,
+        "person2": name2,
+        "snapshot1": snapshot1,
+        "snapshot2": snapshot2,
+        "analysis": {}
+    }
+    
+    def get_profile_metrics(snapshot):
+        github = snapshot.get("github", {})
+        linkedin_raw = snapshot.get("linkedin_raw", [])
+        
+        linkedin_present = len(linkedin_raw) > 0 and any(
+            not d.get("error") for d in linkedin_raw if isinstance(d, dict)
+        )
+        
+        return {
+            "github_present": github and not github.get("error"),
+            "github_repos": github.get("public_repos", 0) if github else 0,
+            "github_followers": github.get("followers", 0) if github else 0,
+            "github_stars": sum(r.get("stars", 0) for r in github.get("top_repos", [])) if github else 0,
+            "linkedin_present": linkedin_present,
+            "has_portfolio": bool(snapshot.get("portfolio")),
+        }
+    
+    metrics1 = get_profile_metrics(snapshot1)
+    metrics2 = get_profile_metrics(snapshot2)
+    
+    analysis = {
+        "github_comparison": {
+            "winner": None,
+            "details": ""
+        },
+        "linkedin_comparison": {
+            "winner": None,
+            "details": ""
+        },
+        "overall_strengths": {
+            name1: [],
+            name2: []
+        },
+        "overall_weaknesses": {
+            name1: [],
+            name2: []
+        }
+    }
+    
+    if metrics1["github_present"] and metrics2["github_present"]:
+        if metrics1["github_repos"] > metrics2["github_repos"]:
+            analysis["github_comparison"]["winner"] = name1
+            analysis["github_comparison"]["details"] = f"{name1} has more repositories ({metrics1['github_repos']} vs {metrics2['github_repos']})"
+        elif metrics2["github_repos"] > metrics1["github_repos"]:
+            analysis["github_comparison"]["winner"] = name2
+            analysis["github_comparison"]["details"] = f"{name2} has more repositories ({metrics2['github_repos']} vs {metrics1['github_repos']})"
+        else:
+            analysis["github_comparison"]["details"] = "Both have similar number of repositories"
+        
+        if metrics1["github_stars"] > metrics2["github_stars"]:
+            analysis["overall_strengths"][name1].append(f"Higher GitHub impact ({metrics1['github_stars']} stars vs {metrics2['github_stars']})")
+        elif metrics2["github_stars"] > metrics1["github_stars"]:
+            analysis["overall_strengths"][name2].append(f"Higher GitHub impact ({metrics2['github_stars']} stars vs {metrics1['github_stars']})")
+    elif metrics1["github_present"]:
+        analysis["github_comparison"]["winner"] = name1
+        analysis["github_comparison"]["details"] = f"{name1} has GitHub presence, {name2} does not"
+        analysis["overall_weaknesses"][name2].append("No GitHub profile found")
+    elif metrics2["github_present"]:
+        analysis["github_comparison"]["winner"] = name2
+        analysis["github_comparison"]["details"] = f"{name2} has GitHub presence, {name1} does not"
+        analysis["overall_weaknesses"][name1].append("No GitHub profile found")
+    else:
+        analysis["github_comparison"]["details"] = "Neither has a GitHub profile"
+    
+    if metrics1["linkedin_present"] and not metrics2["linkedin_present"]:
+        analysis["linkedin_comparison"]["winner"] = name1
+        analysis["linkedin_comparison"]["details"] = f"{name1} has LinkedIn presence, {name2} does not"
+        analysis["overall_weaknesses"][name2].append("No LinkedIn profile found")
+    elif metrics2["linkedin_present"] and not metrics1["linkedin_present"]:
+        analysis["linkedin_comparison"]["winner"] = name2
+        analysis["linkedin_comparison"]["details"] = f"{name2} has LinkedIn presence, {name1} does not"
+        analysis["overall_weaknesses"][name1].append("No LinkedIn profile found")
+    elif metrics1["linkedin_present"] and metrics2["linkedin_present"]:
+        analysis["linkedin_comparison"]["details"] = "Both have LinkedIn presence"
+    else:
+        analysis["linkedin_comparison"]["details"] = "Neither has accessible LinkedIn profile"
+    
+    if metrics1["has_portfolio"]:
+        analysis["overall_strengths"][name1].append("Has portfolio/personal website")
+    else:
+        analysis["overall_weaknesses"][name1].append("No portfolio/personal website found")
+    
+    if metrics2["has_portfolio"]:
+        analysis["overall_strengths"][name2].append("Has portfolio/personal website")
+    else:
+        analysis["overall_weaknesses"][name2].append("No portfolio/personal website found")
+    
+    comparison["analysis"] = analysis
+    
+    report_file = generate_comparison_report(comparison)
+    comparison["report_file"] = report_file
+    
+    print(f"\n=== Comparison complete ===\n")
+    return comparison
+
+
+def generate_comparison_report(comparison: Dict, output_file: str = None) -> str:
+    """
+    Generate comparison report between two profiles.
+    """
+    if not output_file:
+        name1 = comparison.get('person1', 'person1').replace(" ", "_").lower()
+        name2 = comparison.get('person2', 'person2').replace(" ", "_").lower()
+        output_file = f"report/{name1}_vs_{name2}_comparison.txt"
+    
+    os.makedirs("report", exist_ok=True)
+    
+    print(f"Generating comparison report: {output_file}")
+    
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write("=" * 80 + "\n")
+        f.write("HARVEY PROFILE COMPARISON REPORT\n")
+        f.write("=" * 80 + "\n\n")
+        
+        f.write(f"Person 1: {comparison['person1']}\n")
+        f.write(f"Person 2: {comparison['person2']}\n")
+        f.write(f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        
+        analysis = comparison.get("analysis", {})
+        
+        f.write("-" * 80 + "\n")
+        f.write("GITHUB COMPARISON\n")
+        f.write("-" * 80 + "\n")
+        github_comp = analysis.get("github_comparison", {})
+        if github_comp.get("winner"):
+            f.write(f"Winner: {github_comp['winner']}\n")
+        f.write(f"{github_comp.get('details', 'No data')}\n\n")
+        
+        f.write("-" * 80 + "\n")
+        f.write("LINKEDIN COMPARISON\n")
+        f.write("-" * 80 + "\n")
+        linkedin_comp = analysis.get("linkedin_comparison", {})
+        if linkedin_comp.get("winner"):
+            f.write(f"Winner: {linkedin_comp['winner']}\n")
+        f.write(f"{linkedin_comp.get('details', 'No data')}\n\n")
+        
+        f.write("-" * 80 + "\n")
+        f.write("STRENGTHS & WEAKNESSES\n")
+        f.write("-" * 80 + "\n")
+        
+        strengths = analysis.get("overall_strengths", {})
+        weaknesses = analysis.get("overall_weaknesses", {})
+        
+        f.write(f"\n{comparison['person1']}:\n")
+        f.write("  Strengths:\n")
+        for s in strengths.get(comparison['person1'], []):
+            f.write(f"    - {s}\n")
+        if not strengths.get(comparison['person1']):
+            f.write("    - None identified\n")
+        
+        f.write("  Weaknesses:\n")
+        for w in weaknesses.get(comparison['person1'], []):
+            f.write(f"    - {w}\n")
+        if not weaknesses.get(comparison['person1']):
+            f.write("    - None identified\n")
+        
+        f.write(f"\n{comparison['person2']}:\n")
+        f.write("  Strengths:\n")
+        for s in strengths.get(comparison['person2'], []):
+            f.write(f"    - {s}\n")
+        if not strengths.get(comparison['person2']):
+            f.write("    - None identified\n")
+        
+        f.write("  Weaknesses:\n")
+        for w in weaknesses.get(comparison['person2'], []):
+            f.write(f"    - {w}\n")
+        if not weaknesses.get(comparison['person2']):
+            f.write("    - None identified\n")
+        
+        f.write("\n" + "=" * 80 + "\n")
+        f.write("DETAILED SNAPSHOTS\n")
+        f.write("=" * 80 + "\n\n")
+        
+        f.write(f"See individual reports for detailed data:\n")
+        f.write(f"- {comparison['snapshot1'].get('report_file', 'N/A')}\n")
+        f.write(f"- {comparison['snapshot2'].get('report_file', 'N/A')}\n\n")
+        
+        f.write("=" * 80 + "\n")
+        f.write("END OF COMPARISON REPORT\n")
+        f.write("=" * 80 + "\n")
+    
+    print(f"Comparison report saved to {output_file}")
+    return output_file
+
 def build_professional_snapshot(name: str) -> Tuple[Dict, pd.DataFrame]:
     """
     Build comprehensive OSINT snapshot using multi-source search approach.
@@ -516,6 +735,24 @@ def build_professional_snapshot(name: str) -> Tuple[Dict, pd.DataFrame]:
         if api_username:
             github_profile = fetch_github_profile(api_username)
     
+    if github_profile and not github_profile.get("error"):
+        linkedin_from_github = github_profile.get("linkedin_from_github")
+        if linkedin_from_github:
+            print(f"Found LinkedIn URL in GitHub profile, scraping: {linkedin_from_github}")
+            already_scraped = any(
+                linkedin_from_github == d.get("profile_url") 
+                for d in linkedin_data if isinstance(d, dict)
+            )
+            
+            if not already_scraped:
+                try:
+                    scraped = scrape_linkedin_public(linkedin_from_github)
+                    scraped["source"] = "github_bio"
+                    linkedin_data.insert(0, scraped)
+                    time.sleep(random.uniform(1.0, 2.0))
+                except Exception as e:
+                    print(f"Error scraping LinkedIn from GitHub bio: {e}")
+    
     snapshot = {
         "query_name": name,
         "linkedin_searches": linkedin_searches,
@@ -531,7 +768,7 @@ def build_professional_snapshot(name: str) -> Tuple[Dict, pd.DataFrame]:
     for profile in linkedin_data:
         if isinstance(profile, dict):
             df_rows.append({
-                "source": "linkedin",
+                "source": profile.get("source", "linkedin"),
                 "profile_url": profile.get("profile_url"),
                 "full_name": profile.get("full_name"),
                 "title": profile.get("title"),
@@ -564,9 +801,12 @@ tools = [
     {"name": "multi_source_linkedin_search", "description": "Multi-source OSINT search for LinkedIn profiles across multiple search engines.", "func": multi_source_linkedin_search},
     {"name": "multi_source_github_search", "description": "Multi-source OSINT search for GitHub profiles across multiple search engines.", "func": multi_source_github_search},
     {"name": "github_api_search", "description": "Search GitHub using official API with token support.", "func": github_api_search},
+    {"name": "extract_linkedin_from_github", "description": "Extract LinkedIn URL from GitHub profile bio or blog field.", "func": extract_linkedin_from_github},
     {"name": "scrape_linkedin_public", "description": "Scrape public LinkedIn profile data.", "func": scrape_linkedin_public},
     {"name": "fetch_github_profile", "description": "Fetch GitHub profile using official API with token support.", "func": fetch_github_profile},
     {"name": "find_portfolio_link", "description": "Extract portfolio/website from LinkedIn and GitHub data.", "func": find_portfolio_link},
     {"name": "generate_report", "description": "Generate comprehensive text report from OSINT data.", "func": generate_report},
+    {"name": "compare_profiles", "description": "Compare two profiles and generate strength/weakness analysis.", "func": compare_profiles},
+    {"name": "generate_comparison_report", "description": "Generate comparison report between two profiles.", "func": generate_comparison_report},
     {"name": "build_professional_snapshot", "description": "Build comprehensive OSINT snapshot using multi-source search approach.", "func": build_professional_snapshot},
 ]
