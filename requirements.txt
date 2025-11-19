@@ -14,6 +14,4 @@ geckodriver-autoinstaller
 # --- Utilities ---
 tqdm>=4.66.2
 
-transformers>=4.42.0
-accelerate>=0.30.1
-torch>=2.3.0
+
