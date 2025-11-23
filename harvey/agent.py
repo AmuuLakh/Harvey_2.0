@@ -4,19 +4,18 @@ import csv
 import os
 from datetime import datetime
 from typing import List, Dict, Any
-from tools import tools
-from utils import load_json, loads_prompt
+from harvey.tools import tools
+from harvey.utils import load_json, loads_prompt
 
 
 class HarveyAgent:
     """
     Harvey — Autonomous OSINT Reconnaissance Agent.
-    Simple rule-based system that doesn't require Ollama or GPU.
     """
 
     def __init__(self):
-        self.TOOLS_SCHEMA = load_json("tschema.json")
-        self.system_prompt = loads_prompt("sprompt.yaml")
+        self.TOOLS_SCHEMA = load_json("harvey/data/tschema.json")
+        self.system_prompt = loads_prompt("harvey/data/sprompt.yaml")
         self.investigation_mode = False
         self.current_target = None
         self.investigation_data = {}  # Store all gathered data
