@@ -1,23 +1,21 @@
 import json
 import re
-import requests
 import csv
 import os
 from datetime import datetime
 from typing import List, Dict, Any
-from tools import tools
-from utils import load_json, loads_prompt
+from harvey.tools import tools
+from harvey.utils import load_json, loads_prompt
 
 
 class HarveyAgent:
     """
     Harvey — Autonomous OSINT Reconnaissance Agent.
-    Simple rule-based system that doesn't require Ollama or GPU.
     """
 
     def __init__(self):
-        self.TOOLS_SCHEMA = load_json("tschema.json")
-        self.system_prompt = loads_prompt("sprompt.yaml")
+        self.TOOLS_SCHEMA = load_json("harvey/data/tschema.json")
+        self.system_prompt = loads_prompt("harvey/data/sprompt.yaml")
         self.investigation_mode = False
         self.current_target = None
         self.investigation_data = {}  # Store all gathered data
@@ -143,7 +141,7 @@ class HarveyAgent:
         
         self._save_structured_data_to_csv(report_data, csv_path)
         
-        return f"📁 Reports saved:\n- TXT: {txt_path}\n- CSV: {csv_path}"
+        return f"Reports saved:\n- TXT: {txt_path}\n- CSV: {csv_path}"
 
     def _save_structured_data_to_csv(self, report_data: Dict, csv_path: str):
         """Save structured data to CSV format"""
@@ -283,25 +281,25 @@ class HarveyAgent:
         if "error" in result:
             return f"Investigation failed: {result['error']}"
         
-        response = f"## 🔍 Investigation Started: {self.current_target}\n\n"
+        response = f"##Investigation Started: {self.current_target}\n\n"
         
         # LinkedIn results
         linkedin_profiles = result.get("linkedin_profiles_found", [])
         if linkedin_profiles:
-            response += f"**📊 LinkedIn Profiles Found:** {len(linkedin_profiles)}\n"
+            response += f"**LinkedIn Profiles Found:** {len(linkedin_profiles)}\n"
             for profile in linkedin_profiles[:3]:
                 response += f"- {profile}\n"
             
             # Show validation status
             if result.get("validation_status") == "github_validated":
-                response += f"\n✅ **LinkedIn Validated via GitHub**\n"
+                response += f"\n**LinkedIn Validated via GitHub**\n"
         else:
-            response += "**📊 LinkedIn:** No public profiles found\n"
+            response += "**LinkedIn:** No public profiles found\n"
         
         # GitHub results
         github_data = result.get("github", {})
         if github_data and not github_data.get("error"):
-            response += f"\n**💻 GitHub:** {github_data.get('name', 'Unknown')} (@{github_data.get('github_username')})\n"
+            response += f"\n**GitHub:** {github_data.get('name', 'Unknown')} (@{github_data.get('github_username')})\n"
             response += f"Bio: {github_data.get('bio', 'Not provided')}\n"
             response += f"Public Repos: {github_data.get('public_repos', 0)}\n"
             
@@ -312,14 +310,14 @@ class HarveyAgent:
             if github_data.get('top_repos'):
                 response += f"Top Repos: {len(github_data['top_repos'])} repositories\n"
         elif github_data and github_data.get("error"):
-            response += f"\n**💻 GitHub:** {github_data.get('error')}\n"
+            response += f"\n**GitHub:** {github_data.get('error')}\n"
         else:
-            response += "\n**💻 GitHub:** No profile found\n"
+            response += "\n**GitHub:** No profile found\n"
         
         # Portfolio
         portfolio = result.get("portfolio")
         if portfolio:
-            response += f"\n**🌐 Portfolio/Website:** {portfolio}\n"
+            response += f"\n**Portfolio/Website:** {portfolio}\n"
         
         # LinkedIn raw data
         linkedin_raw = result.get("linkedin_raw", [])
@@ -330,7 +328,7 @@ class HarveyAgent:
                     if profile.get('title'):
                         response += f" - {profile.get('title')}"
         
-        response += f"\n\n**💾 Data gathered and saved.** Say 'make report' to see the complete report and save files!"
+        response += f"\n\n**Data gathered and saved.** Say 'make report' to see the complete report and save files!"
         return response
 
     def _format_linkedin_response(self, result: List) -> str:
@@ -338,7 +336,7 @@ class HarveyAgent:
         if not result:
             return f"No LinkedIn profiles found for {self.current_target}."
         
-        response = f"🔍 Found {len(result)} potential LinkedIn profiles for {self.current_target}:\n"
+        response = f"Found {len(result)} potential LinkedIn profiles for {self.current_target}:\n"
         for url in result[:3]:
             response += f"- {url}\n"
         return response
@@ -359,25 +357,25 @@ class HarveyAgent:
             return result["error"]
         
         data = result.get("data", {})
-        response = f"# 📊 COMPREHENSIVE OSINT REPORT\n"
+        response = f"# COMPREHENSIVE OSINT REPORT\n"
         response += f"**Target:** {self.current_target}\n"
         response += f"**Generated:** {result.get('timestamp', 'Now')}\n\n"
         
         # LinkedIn Section
         linkedin_profiles = data.get("linkedin_profiles_found", [])
-        response += f"## 🔗 LinkedIn Findings\n"
+        response += f"##LinkedIn Findings\n"
         response += f"Profiles Found: {len(linkedin_profiles)}\n"
         for i, profile in enumerate(linkedin_profiles[:5], 1):
             response += f"{i}. {profile}\n"
         
         # Show validation status
         if data.get("validation_status") == "github_validated":
-            response += f"\n✅ **LINKEDIN VALIDATED VIA GITHUB**\n"
+            response += f"\n**LINKEDIN VALIDATED VIA GITHUB**\n"
             response += f"Using authoritative LinkedIn from GitHub profile\n"
         
         # GitHub Section
         github_data = data.get("github", {})
-        response += f"\n## 💻 GitHub Findings\n"
+        response += f"\n##GitHub Findings\n"
         if github_data and not github_data.get("error"):
             response += f"Username: {github_data.get('github_username')}\n"
             response += f"Name: {github_data.get('name', 'Not provided')}\n"
@@ -395,7 +393,7 @@ class HarveyAgent:
         
         # Portfolio Section
         portfolio = data.get("portfolio")
-        response += f"\n## 🌐 Portfolio/Website\n"
+        response += f"\n##Portfolio/Website\n"
         if portfolio:
             response += f"Found: {portfolio}\n"
         else:
@@ -404,7 +402,7 @@ class HarveyAgent:
         # Profile Data Section
         linkedin_raw = data.get("linkedin_raw", [])
         if linkedin_raw:
-            response += f"\n## 👤 Profile Details\n"
+            response += f"\n##Profile Details\n"
             for profile in linkedin_raw:
                 if isinstance(profile, dict):
                     if profile.get('full_name'):
@@ -417,7 +415,7 @@ class HarveyAgent:
                         response += f"**About:** {profile.get('talks_about')}\n"
                     response += "---\n"
         
-        response += f"\n## 📈 Summary\n"
+        response += f"\n##Summary\n"
         response += f"Total Data Sources: {len(linkedin_profiles) + (1 if github_data else 0)}\n"
         response += f"Confidence Level: {'High' if linkedin_profiles or github_data else 'Low'}\n"
         response += f"Recommendation: {'Further investigation recommended' if linkedin_profiles or github_data else 'Limited public data available'}\n"
