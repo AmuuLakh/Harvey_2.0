@@ -9,9 +9,6 @@ from bs4 import BeautifulSoup, FeatureNotFound
 import pandas as pd
 import base64
 
-# ================================================================
-# CONFIGURATION
-# ================================================================
 
 DEFAULT_HEADERS = {
     "User-Agent": (
@@ -22,10 +19,6 @@ DEFAULT_HEADERS = {
 }
 REQUEST_TIMEOUT = 10
 MAX_RETRIES = 2
-
-# ================================================================
-# ENHANCED UTILITIES FOR GITHUB DETECTION
-# ================================================================
 
 def _safe_get(url: str, params=None, headers=None, timeout=REQUEST_TIMEOUT) -> Optional[requests.Response]:
     """Simple GET with retries and polite jitter."""
@@ -139,8 +132,9 @@ def _fetch_github_readme_content(username: str, headers: Dict) -> str:
                 if content:
                     decoded_content = base64.b64decode(content).decode('utf-8')
                     all_content += f" {decoded_content}"
-                    print(f"✅ Found README content from {readme_url}")
+                    print(f"Found README content from {readme_url}")
         except Exception as e:
+            print(f"Error: {e}")
             continue
     
     return all_content
@@ -207,11 +201,6 @@ def _scrape_github_profile_page(username: str) -> str:
     
     return ""
 
-
-# ================================================================
-# ENHANCED GITHUB PROFILE FETCHING
-# ================================================================
-
 def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
     """
     Retrieve basic GitHub user info + enhanced LinkedIn/email detection.
@@ -228,7 +217,7 @@ def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
     else:
         username = username_or_url
 
-    print(f"🔍 Enhanced GitHub scan for: {username}")
+    print(f"Enhanced GitHub scan for: {username}")
     base = "https://api.github.com"
     user_url = f"{base}/users/{username}"
     
@@ -259,12 +248,8 @@ def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
         "linkedin_from_github": None,
         "email_from_github": None,
     }
-
-    # ================================================================
-    # AGGRESSIVE LINKEDIN & EMAIL DETECTION
-    # ================================================================
     
-    print(f"🕵️  Scanning multiple sources for LinkedIn/Email...")
+    print(f"Scanning multiple sources for LinkedIn/Email...")
     
     # Collect text from multiple sources
     all_text_sources = []
@@ -283,19 +268,19 @@ def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
     readme_content = _fetch_github_readme_content(username, headers)
     if readme_content:
         all_text_sources.append(readme_content)
-        print(f"   📖 Scanned README files")
+        print(f" Scanned README files")
     
     # 3. Repository descriptions
     repo_descriptions = _fetch_github_repo_descriptions(username, headers, max_repos=10)
     if repo_descriptions:
         all_text_sources.append(repo_descriptions)
-        print(f"   📚 Scanned {max_repos} repo descriptions")
+        print(f"Scanned {max_repos} repo descriptions")
     
     # 4. Profile page scraping (as fallback)
     profile_page_content = _scrape_github_profile_page(username)
     if profile_page_content:
         all_text_sources.append(profile_page_content)
-        print(f"   🌐 Scanned profile page")
+        print(f"Scanned profile page")
     
     # Combine all text for analysis
     combined_text = " ".join([str(text) for text in all_text_sources if text])
@@ -305,23 +290,23 @@ def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
     email_address = None
     
     if combined_text:
-        print(f"   🔎 Analyzing {len(combined_text)} characters of text...")
+        print(f"Analyzing {len(combined_text)} characters of text...")
         
         # LinkedIn detection
         linkedin_url = _extract_linkedin_from_text(combined_text)
         if linkedin_url:
-            print(f"   ✅ LinkedIn found: {linkedin_url}")
+            print(f"LinkedIn found: {linkedin_url}")
         else:
-            print(f"   ❌ No LinkedIn detected in GitHub data")
+            print(f"No LinkedIn detected in GitHub data")
         
         # Email detection
         email_address = _extract_email_from_text(combined_text)
         if email_address:
-            print(f"   ✅ Email found: {email_address}")
+            print(f"Email found: {email_address}")
         else:
-            print(f"   ❌ No email detected in GitHub data")
+            print(f"No email detected in GitHub data")
     else:
-        print(f"   ⚠️  No text content found for analysis")
+        print(f"No text content found for analysis")
 
     info["linkedin_from_github"] = linkedin_url
     info["email_from_github"] = email_address
@@ -351,17 +336,13 @@ def fetch_github_profile(username_or_url: str, max_repos: int = 5) -> Dict:
         findings.append("Email")
     
     if findings:
-        print(f"🎯 SUCCESS: Found {', '.join(findings)} in GitHub data")
+        print(f"SUCCESS: Found {', '.join(findings)} in GitHub data")
     else:
         print(f"ℹ️  No contact info found in GitHub data for {username}")
 
     print(f"Found GitHub user: {info['name'] or username} with {len(info['top_repos'])} repos")
     return info
 
-
-# ================================================================
-# KEEP ALL OTHER FUNCTIONS THE SAME (but update build_professional_snapshot)
-# ================================================================
 
 def build_professional_snapshot(name: str,
                                 use_search: bool = True,
@@ -398,20 +379,16 @@ def build_professional_snapshot(name: str,
         else:
             print(f"GitHub lookup failed: {gh_info.get('error')}")
 
-    # ================================================================
-    # LINKEDIN VALIDATION & REPLACEMENT LOGIC
-    # ================================================================
-    
     validated_linkedin_urls = linkedin_urls.copy()
     validated_results = results.copy()
     
     if github_profile and github_profile.get("linkedin_from_github"):
         github_linkedin = github_profile["linkedin_from_github"]
-        print(f"🔍 Validating LinkedIn from GitHub: {github_linkedin}")
+        print(f"Validating LinkedIn from GitHub: {github_linkedin}")
         
         # Check if this GitHub LinkedIn is different from what we found
         if github_linkedin not in validated_linkedin_urls:
-            print(f"🔄 GitHub LinkedIn is different from search results")
+            print(f"   GitHub LinkedIn is different from search results")
             print(f"   Search found: {validated_linkedin_urls}")
             print(f"   GitHub has: {github_linkedin}")
             
@@ -424,14 +401,14 @@ def build_professional_snapshot(name: str,
                 validated_linkedin_urls = [github_linkedin]
                 # Remove old results and add the validated one
                 validated_results = [test_result]
-                print(f"✅ SUCCESS: Using GitHub-validated LinkedIn: {github_linkedin}")
-                print(f"   Profile name: {test_result.get('full_name')}")
+                print(f"SUCCESS: Using GitHub-validated LinkedIn: {github_linkedin}")
+                print(f"Profile name: {test_result.get('full_name')}")
             else:
-                print(f"❌ GitHub LinkedIn failed validation, keeping original results")
+                print(f"GitHub LinkedIn failed validation, keeping original results")
                 if test_result and test_result.get("error"):
                     print(f"   Error: {test_result.get('error')}")
         else:
-            print(f"✅ GitHub LinkedIn matches our search results")
+            print(f"GitHub LinkedIn matches our search results")
 
     snapshot = {
         "query_name": name,
@@ -445,6 +422,22 @@ def build_professional_snapshot(name: str,
 
     portfolio = find_portfolio_link([github_profile] + validated_results if github_profile else validated_results)
     snapshot["portfolio"] = portfolio
+    disambiguation_result = smart_person_disambiguation(name, github_profile, validated_linkedin_urls)
+
+    if disambiguation_result["linkedin_url"] and disambiguation_result["confidence"] in ["high", "medium"]:
+        print(f"Disambiguation selected: {disambiguation_result['linkedin_url']}")
+        print(f"Confidence: {disambiguation_result['confidence']}")
+        print(f"Signals: {disambiguation_result['matching_signals']}")
+        
+        # Use the disambiguated LinkedIn URL
+        if disambiguation_result["linkedin_url"] != validated_linkedin_urls[0]:
+            validated_linkedin_urls = [disambiguation_result["linkedin_url"]]
+            # Re-scrape to get fresh data
+            fresh_data = scrape_linkedin_public(disambiguation_result["linkedin_url"])
+            validated_results = [fresh_data] if fresh_data else validated_results
+
+    # Add disambiguation info to snapshot
+    snapshot["disambiguation"] = disambiguation_result
 
     df_rows = []
     for r in validated_results:
@@ -479,16 +472,12 @@ def build_professional_snapshot(name: str,
     # Final validation report
     if github_profile and github_profile.get("linkedin_from_github"):
         if github_profile["linkedin_from_github"] in validated_linkedin_urls:
-            print(f"🎯 SUCCESS: LinkedIn validated via GitHub - using authoritative source")
+            print(f"SUCCESS: LinkedIn validated via GitHub - using authoritative source")
         else:
-            print(f"⚠️  WARNING: LinkedIn from GitHub couldn't be validated")
+            print(f"WARNING: LinkedIn from GitHub couldn't be validated")
     
     return snapshot, df
 
-
-# ================================================================
-# KEEP ALL OTHER EXISTING FUNCTIONS EXACTLY THE SAME
-# ================================================================
 
 def search_linkedin_footprints(name: str, max_results: int = 3) -> List[str]:
     """Return a list of public LinkedIn profile URLs for a given name."""
@@ -711,7 +700,7 @@ def find_portfolio_link(sources: List[Dict]) -> Optional[str]:
     for s in sources:
         if isinstance(s, dict) and s.get("linkedin_from_github"):
             linkedin_url = s["linkedin_from_github"]
-            print(f"🔗 Found LinkedIn from GitHub: {linkedin_url}")
+            print(f"Found LinkedIn from GitHub: {linkedin_url}")
             # We don't return LinkedIn as portfolio, but we log it
     
     # Then check for regular portfolio links
@@ -739,6 +728,71 @@ def find_portfolio_link(sources: List[Dict]) -> Optional[str]:
     print("No portfolio link found")
     return None
 
+
+def smart_person_disambiguation(name: str, github_profile: Dict, linkedin_profiles: List[str]) -> Dict:
+    """
+    Smart matching to find the right person among multiple matches
+    Uses multiple signals to disambiguate
+    """
+    print(f"Smart disambiguation for {name} with {len(linkedin_profiles)} profiles")
+    
+    best_match = {
+        "linkedin_url": None,
+        "github_username": github_profile.get("github_username") if github_profile else None,
+        "confidence": "low",
+        "matching_signals": []
+    }
+    
+    # If GitHub has LinkedIn, that's our best bet
+    if github_profile and github_profile.get("linkedin_from_github"):
+        github_linkedin = github_profile["linkedin_from_github"]
+        if github_linkedin in linkedin_profiles:
+            best_match["linkedin_url"] = github_linkedin
+            best_match["confidence"] = "high"
+            best_match["matching_signals"].append("github_linkedin_match")
+            print(f"High confidence: LinkedIn validated via GitHub")
+        return best_match
+    
+    # If no GitHub LinkedIn, try other matching strategies
+    if github_profile and linkedin_profiles:
+        github_name = github_profile.get("name", "").lower()
+        github_location = github_profile.get("location", "").lower()
+        github_company = github_profile.get("company", "").lower()
+        
+        # Test each LinkedIn profile against GitHub data
+        for linkedin_url in linkedin_profiles[:3]:  # Check first 3
+            try:
+                linkedin_data = scrape_linkedin_public(linkedin_url)
+                if linkedin_data and not linkedin_data.get("error"):
+                    matches = []
+                    
+                    # Name matching
+                    linkedin_name = linkedin_data.get("full_name", "").lower()
+                    if github_name and linkedin_name and github_name in linkedin_name:
+                        matches.append("name_similarity")
+                    
+                    # Location matching (if available)
+                    if github_location and linkedin_data.get("talks_about"):
+                        linkedin_bio = linkedin_data.get("talks_about", "").lower()
+                        if github_location in linkedin_bio:
+                            matches.append("location_match")
+                    
+                    # Company matching
+                    if github_company and linkedin_data.get("title", "").lower():
+                        linkedin_title = linkedin_data.get("title", "").lower()
+                        if github_company in linkedin_title:
+                            matches.append("company_match")
+                    
+                    if matches and len(matches) > len(best_match["matching_signals"]):
+                        best_match["linkedin_url"] = linkedin_url
+                        best_match["confidence"] = "medium" if len(matches) > 1 else "low"
+                        best_match["matching_signals"] = matches
+                        print(f"Medium confidence: Matches {matches}")
+                        
+            except Exception as e:
+                continue
+    
+    return best_match
 
 tools = [
     {"name": "search_linkedin_footprints", "description": "Searches public LinkedIn profiles by name using search engine footprints.", "func": search_linkedin_footprints},
